@@ -1,6 +1,6 @@
 /*
  * File:   main.c
- * Author: kagandonmez
+ * Author: beratalp
  *
  * Created on February 15, 2020, 4:28 PM
  */
@@ -29,59 +29,73 @@
 #define _XTAL_FREQ 4000000
 #include "uart.h"
 
-void delayFun(int x);
+void variableDelay(int x);
 
 void main(){
-	OSCCON = 0b01101010;
-    OPTION_REGbits.nRBPU=0;
-	TRISB0 = 0;
+	OSCCON = 0b01101010; //set the internal oscillator to 4MHz
+    OPTION_REGbits.nRBPU=0; //enable internal pull-up resistors
+    //mark LED connections as digital outputs
+	TRISB0 = 0; 
     TRISB1 = 0;
     TRISB4 = 0;
-    //INTCONbits.PEIE = 1;
-    //INTCONbits.GIE = 1;
-    //PIE1bits.RCIE = 1;
-    UART_Init(300);
+    UART_Init(300); //enable the UART port, the baud rate is 300
+    //shut of the LED by pulling the ports up.
     RB0 = 1;
     RB1 = 1;
     RB4 = 1;
+    //declare mode variables
     char mode = 'o';
     short delay = 0;
+    //enter the main loop
     while(1){
-        if(RCIF){
-            char first = UART_Read();
-            char second = UART_Read();
-            mode = first;
-            if(second == '0')
+        if(RCIF){ //check for the UART receive buffer
+            char first = UART_Read(); //read the first character
+            char second = UART_Read(); //read the second character
+            mode = first; //set the color mode as the first char
+            if(second == '0') //set the blink mode through the delay
                 delay = 0;
             else if(second == '1')
                 delay = 1000;
             else if(second == '2')
                 delay = 500;
         }
-        if(mode == 'r'){
+        if(mode == 'r'){ //red
             RB1 = 1;
             RB4 = 1;
             RB0 = 0;
-        } else if(mode == 'b'){
+        } else if(mode == 'b'){ //blue
             RB1 = 1;
             RB4 = 0;
             RB0 = 1;
-        } else if(mode == 'g'){
+        } else if(mode == 'g'){ //green
             RB1 = 0;
             RB4 = 1;
             RB0 = 1;
-        }
-        if(delay > 0){
-            delayFun(delay);
+        } else if(mode == 'o'){ //off
             RB1 = 1;
             RB4 = 1;
             RB0 = 1;
-            delayFun(delay);
+        } else { //if an invalid char is sent, send an error '00' string, and turn the LED off
+            UART_Write_Text("00"); 
+            mode = 'o';
+        }
+        if(delay > 0){ //if there should be a blink, enable it
+            variableDelay(delay);
+            RB1 = 1;
+            RB4 = 1;
+            RB0 = 1;
+            variableDelay(delay);
         }
     }
 }
 
-void delayFun(int x){
+/**
+ * This function implements a variable delay function, since Microchip's implementation
+ * of __delay_ms and __delay_us only supports constant parameters.
+ * The function is not as exact as the __delay_ms(), since it requires additional clock cycles to run.
+ * @param x delay (in milliseconds)
+ */
+void variableDelay(int x){
     for(int i = 0; i < x; i++){
         __delay_ms(1);
     }
